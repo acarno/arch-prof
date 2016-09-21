@@ -5,18 +5,29 @@ import subprocess
 import time
 
 class ProgramProfile(object):
+    """ Extensible class that encapsulates all of the profiling activities """
 
+    # Class Constants
+    #   warmup_time         time before a program runs to wait (while still
+    #                           gathering data)
+    #   cooldown_time       time after a program ends to wait (while still
+    #                           gathering data)
+    #   frequency           number of samples to gather per second
     warmup_time = 5.0
     cooldown_time = 5.0
-    quantum = 0.25
+    frequency = 4  
 
     def __init__(self, program):
+        """ Class initialization
+
+            Inputs:
+                program     name of program to execute (should include path)
+        """
         self.program = program
 
         self.start_time = 0.0
         self.end_time = 0.0
         self.power_measurements = []
-
 
     def __repr__(self):
         return 'ProgramProfile({})'.format(self.program)
@@ -27,26 +38,43 @@ class ProgramProfile(object):
         powr_str = '# of Pwr Readings: {}'.format(len(self.power_measurements))
         return '\n'.join([name_str, time_str, powr_str])
 
-    def run(self):
-        print('Running {}'.format(self.program))
+    def run(self, outfile):
+        """ Runs profiling
 
+            Inputs:
+                outfile     file to dump output of program (if any) to
+        """
+        
+        # Start logging power
         parent_conn, child_conn = Pipe()
         logging_proc = self.begin_logging_power(child_conn)
 
+        # Wait for warmup time
+        print('Warming up...')
         time.sleep(self.warmup_time)
 
+        # Run program
+        print('Running {}...'.format(self.program))
         self.start_time = time.monotonic()
-        with open(os.devnull, 'w') as FNULL:
-            subprocess.call(self.program, stdout=FNULL, 
-                            stderr=subprocess.STDOUT)
+        with open(outfile, 'w') as f:
+            subprocess.call(self.program, stdout=f, stderr=subprocess.STDOUT)
         self.end_time = time.monotonic()
+        print('{} complete.'.format(self.program))
 
+        # Wait for cooldown time
+        print('Cooling down...')
         time.sleep(self.cooldown_time)
 
+        # Stop logging power
         self.end_logging_power(logging_proc, parent_conn)
 
-    def dump_to_file(self, filename):
-        with open(filename, 'w') as f:
+    def dump_to_file(self, dumpfile):
+        """ Dump all gathered data to a CSV file 
+
+            Inputs:
+                dumpfile    file to dump data to
+        """
+        with open(dumpfile, 'w') as f:
             f.write(self.program)
             f.write('\n')
 
@@ -61,30 +89,56 @@ class ProgramProfile(object):
                 f.write('\n')
 
     def begin_logging_power(self, conn):
+        """ Starts logging power, using a separate process
+
+            Inputs:
+                conn        one end of a Pipe()
+
+            Returns:
+                logging_proc    Pythonic-process object (for joining later)
+        """
         logging_proc = Process(target=self.log_power, args=(conn, ))
         logging_proc.start()
         return logging_proc
 
     def end_logging_power(self, logging_proc, conn):
-        conn.send('1')
+        """ Stops logging power and receives power data from process
+
+            Inputs:
+                logging_proc    Pythonic-process object (started earlier)
+                conn            one end of a Pipe()
+        """
+        conn.send('1')  #Doesn't matter what is sent, just that something is
         self.power_measurements = conn.recv()
         logging_proc.join()
 
     def log_power(self, conn):
+        """ Records instantaneous power consumption until signaled
+
+            Inputs:
+                conn            one end of a Pipe()
+        """
         power_measurements = []
 
+        # Measures until something shows up on receiving end of conn
         while not conn.poll():
             t = time.monotonic()
             p = self.read_power()
             power_measurements.append([t] + p)
-            time.sleep(self.quantum)
+            time.sleep(1.0 / self.frequency)
 
+        # Sends all gathered data back through conn
         conn.send(power_measurements)
 
     def read_power(self):
+        """ Read instantaneous power
+
+            TO BE IMPLEMENTED PER-SYSTEM
+        """
         return [0.0]
 
 class x86ProgramProfile(ProgramProfile):
+    """ Subclass of ProgramProfile for reading power on x86 system """
 
     def read_power(self):
         power_reading = None
