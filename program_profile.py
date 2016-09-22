@@ -151,3 +151,18 @@ class x86ProgramProfile(ProgramProfile):
         temp = power_reading[1].split('\t')
         temp = [int(x) for x in temp[1:]]
         return temp
+
+class xgeneProgramProfile(ProgramProfile):
+    """ Subclass of ProgramProfile for reading power on X-Gene 1 ARM system """
+
+    def read_power(self):
+        power_reading = None
+
+        # Read /proc/power
+        with codecs.open('/proc/power', 'r', 'utf-8') as f:
+            power_reading = f.readlines()
+
+        # Parse file contents
+        temp = power_reading[2].split('\t')
+        temp = [int(x) for x in temp[1:]]
+        return temp
