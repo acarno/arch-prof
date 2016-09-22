@@ -166,3 +166,40 @@ class xgeneProgramProfile(ProgramProfile):
         temp = power_reading[0].split('\t')
         temp = [int(x) for x in temp[1:]]
         return temp
+        
+class caviumProgramProfile(ProgramProfile):
+	""" Subclass for the cavium. Here I'm using IPMI to measure power so 
+	    it is (1) not precise as sensrs are updated every ~2secs and 
+	    it's also more intrusive as we are forking a process to get one
+	    measurement. But for now this is the only thing we have.
+	"""
+	
+	#IP of the ipmi interface, subject to change (DHCP):
+	ipmi_ip = "10.1.1.159" 
+	ipmi_user = "admin"
+	ipmi_pw = "password"
+		
+	# Sensor IDs
+	voltage0=65
+	voltage1=66
+	current0=130
+	current1=133
+	
+	def read_power(self):
+		# build the command line
+		cmd = ["/usr/local/sbin/ipmi-sensors", "-h", self.ipmi_ip, "-u", \
+			self.ipmi_user, "-p", self.ipmi_pw, "-r", str(self.voltage0), \
+			"-r", str(self.voltage1), "-r", str(self.current0), "-r", \
+			str(self.current1)]
+			
+		out = subprocess.check_output(cmd).decode('utf8').replace(" ", "")
+		
+		# Compute power for P0 and P1
+		splitted_out = out.split("|")
+		p0_voltage = float(splitted_out[8])
+		p0_current = float(splitted_out[18])
+		p1_voltage = float(splitted_out[13])
+		p1_current = float(splitted_out[23])
+		
+		return [p0_voltage*p0_current, p1_voltage*p1_current]
+	
