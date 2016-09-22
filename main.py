@@ -1,14 +1,25 @@
 #!/usr/bin/env python3
 
 import argparse
+import inspect
 import os, os.path
 
-# NEEDS TO BE UPDATE PER-SYSTEM
-from program_profile import ProgramProfile
+import program_profile
+
+def get_profiles():
+    profiles = []
+    for name, obj in inspect.getmembers(program_profile):
+        if inspect.isclass(obj) and obj.__module__ == program_profile.__name__:
+            if name != 'ProgramProfile':
+                profiles.append(name)
+    return profiles
 
 def parse_arguments():
     """ Parses program arguments """
     parser = argparse.ArgumentParser()
+    parser.add_argument('profile',
+                        help='Name of profile (specific to system)',
+                        choices=get_profiles())
     parser.add_argument('prog_folder',
                         help='Location of programs to run')
     parser.add_argument('log_folder',
@@ -21,8 +32,9 @@ def main(args):
     # For every program in folder (assuming folder ONLY contains programs)
     for program in sorted(os.listdir(args.prog_folder)):
 
-        # Create ProgramProfile (NEEDS TO BE UPDATED PER-SYSTEM)
-        profile = ProgramProfile(os.path.join(args.prog_folder, program))
+        # Create ProgramProfile
+        path = os.path.join(args.prog_folder, program)
+        profile = getattr(program_profile, args.profile)(path)
 
         # Run profiling
         outfile = os.path.join(args.log_folder, '{}.output'.format(program))
