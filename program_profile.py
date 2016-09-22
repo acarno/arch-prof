@@ -163,6 +163,6 @@ class xgeneProgramProfile(ProgramProfile):
             power_reading = f.readlines()
 
         # Parse file contents
-        temp = power_reading[2].split('\t')
+        temp = power_reading[0].split('\t')
         temp = [int(x) for x in temp[1:]]
         return temp
