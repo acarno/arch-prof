@@ -2,6 +2,7 @@ import codecs
 from multiprocessing import Pipe, Process
 import os
 import subprocess
+import sys
 import time
 
 class ProgramProfile(object):
@@ -17,13 +18,15 @@ class ProgramProfile(object):
     cooldown_time = 5.0
     frequency = 4  
 
-    def __init__(self, program):
+    def __init__(self, program, num_threads=1):
         """ Class initialization
 
             Inputs:
                 program     name of program to execute (should include path)
+                num_threads number of threads to run program with (default: 1)
         """
         self.program = program
+        self.num_threads = num_threads
 
         self.start_time = 0.0
         self.end_time = 0.0
@@ -34,9 +37,10 @@ class ProgramProfile(object):
 
     def __str__(self):
         name_str = 'Program Name:      {}'.format(self.program)
+        thr_str =  'Number of Threads: {}'.format(self.num_threads)
         time_str = 'Execution Time:    {}'.format(self.end_time-self.start_time)
         powr_str = '# of Pwr Readings: {}'.format(len(self.power_measurements))
-        return '\n'.join([name_str, time_str, powr_str])
+        return '\n'.join([name_str, thr_str, time_str, powr_str])
 
     def run(self, outfile):
         """ Runs profiling
@@ -53,8 +57,14 @@ class ProgramProfile(object):
         print('Warming up...')
         time.sleep(self.warmup_time)
 
+        # Set number of threads to run
+        os.environ['OMP_NUM_THREADS'] = str(self.num_threads)
+
         # Run program
-        print('Running {}...'.format(self.program))
+        run_str = 'Running {}, {} thread(s)...'
+        run_str = run_str.format(self.program, self.num_threads)
+        print(run_str)
+
         self.start_time = time.monotonic()
         with open(outfile, 'w') as f:
             subprocess.call(self.program, stdout=f, stderr=subprocess.STDOUT)
@@ -76,6 +86,9 @@ class ProgramProfile(object):
         """
         with open(dumpfile, 'w') as f:
             f.write(self.program)
+            f.write('\n')
+
+            f.write('{}'.format(self.num_threads))
             f.write('\n')
 
             f.write('{}'.format(self.start_time))
@@ -140,6 +153,17 @@ class ProgramProfile(object):
 class x86ProgramProfile(ProgramProfile):
     """ Subclass of ProgramProfile for reading power on x86 system """
 
+    def __init__(self, *args, **kwargs):
+        with codecs.open('/proc/power', 'r', 'utf-8') as f:
+            tmp = f.readlines()
+            tmp = [int(x) for x in tmp[1].split('\t')[1:]]
+            if 0 in tmp:
+                errmsg = 'ERROR: /proc/power returns 0!'
+                errmsg += '\nDid you insmod x86_power_sensor.ko?'
+                print(errmsg)
+                sys.exit(1)
+        super().__init__(*args, **kwargs)
+
     def read_power(self):
         power_reading = None
 
@@ -154,6 +178,17 @@ class x86ProgramProfile(ProgramProfile):
 
 class xgeneProgramProfile(ProgramProfile):
     """ Subclass of ProgramProfile for reading power on X-Gene 1 ARM system """
+
+    def __init__(self, *args, **kwargs):
+        with codecs.open('/proc/power', 'r', 'utf-8') as f:
+            tmp = f.readlines()
+            tmp = [int(x) for x in tmp[0].split('\t')[1:]]
+            if 0 in tmp:
+                errmsg = 'ERROR: /proc/power returns 0!'
+                errmsg += '\nDid you insmod arm_power_sensor.ko?'
+                print(errmsg)
+                sys.exit(1)
+        super().__init__(*args, **kwargs)
 
     def read_power(self):
         power_reading = None
