@@ -37,7 +37,8 @@ def profile_program(args, program, num_threads=1):
     path = os.path.join(args.prog_folder, program)
     profile = getattr(program_profile, args.profile)(path, num_threads)
 
-    program_name = '.'.join(program.split('.')[:-1] + [str(num_threads)])
+    # program_name = '.'.join(program.split('.')[:-1] + [str(num_threads)])
+    program_name = program + "." + str(num_threads)
     # Run profiling
     outfile = os.path.join(args.log_folder, '{}.output'.format(program_name))
     print('Sending program output to {}'.format(outfile))
