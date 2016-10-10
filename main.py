@@ -25,7 +25,7 @@ def parse_arguments():
     parser.add_argument('log_folder',
                         help='Location of log files')
     parser.add_argument('--thread_counts',
-                        help='Thread counts to run (separated by commas)')
+                        help='OMP Thread counts to run (separated by commas)')
     parser.add_argument('--config',
                         help='Configuration file containing files to run')
     args = parser.parse_args()
